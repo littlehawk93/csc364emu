@@ -87,6 +87,26 @@ func NewEmulator() *Emulator {
 // LoadROM - Populate the ROM of this emulator using a I8HEX ROM File
 func (me *Emulator) LoadROM(file *ihex.I8HEX) error {
 
+	for record := file.NextRecord(); record != nil; {
+
+		if record.RecordType == ihex.RecordTypeData {
+
+			if len(record.Data) != 2 {
+				return fmt.Errorf("Unexpected data record size: %d", len(record.Data))
+			}
+
+			instruction := uint16((uint16(record.Data[0]) << 8) | (uint16(record.Data[1]) & 0x00FF))
+
+			if record.AddressOffset >= hwROMSize {
+				return fmt.Errorf("Invalid Address Offset: %d", record.AddressOffset)
+			}
+
+			me.ROM[record.AddressOffset] = instruction
+		} else if record.RecordType == ihex.RecordTypeEndOfFile {
+			break
+		}
+	}
+
 	return nil
 }
 

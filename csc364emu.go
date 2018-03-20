@@ -6,6 +6,8 @@ import (
 	"os"
 )
 
+var gui *EmulatorGUI
+
 var emu *Emulator
 
 func main() {
@@ -24,15 +26,17 @@ func main() {
 
 	emu = NewEmulator()
 
-	err := InitGui()
+	gui, err := NewGui(emu)
 
 	if err != nil {
 		panic(err)
 	}
 
-	defer CloseGui()
+	defer gui.Close()
 
 	if tickTime != nil && *tickTime >= 0 {
 		emu.TickTime = *tickTime
 	}
+
+	gui.MainLoop()
 }

@@ -6,45 +6,62 @@ import (
 	"github.com/jroimartin/gocui"
 )
 
-var gui *gocui.Gui
-
-// CloseGui - Close the terminal GUI
-func CloseGui() {
-
-	gui.Close()
+// EmulatorGUI - Struct for managing displaying emulator properties on a Terminal GUI
+type EmulatorGUI struct {
+	emulatorStarted bool
+	emulator        *Emulator
+	gui             *gocui.Gui
 }
 
-// InitGui - Initialize the terminal GUI
-func InitGui() error {
+// Close - Close the terminal GUI
+func (me *EmulatorGUI) Close() {
+
+	me.gui.Close()
+}
+
+// NewGui - Initialize the terminal GUI
+func NewGui(emu *Emulator) (*EmulatorGUI, error) {
+
+	var emuGui EmulatorGUI
+
+	emuGui.emulator = emu
 
 	gui, err := gocui.NewGui(gocui.OutputNormal)
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	gui.Mouse = false
 
-	gui.SetManagerFunc(LayoutGui)
+	gui.SetManagerFunc(emuGui.layoutGui)
 
 	if err = gui.SetKeybinding("", gocui.KeyCtrlC, gocui.ModNone, quit); err != nil {
 
-		CloseGui()
-		return err
+		emuGui.Close()
+		return nil, err
 	}
 
-	return nil
+	if err = gui.SetKeybinding("", gocui.KeyEnter, gocui.ModNone, emuGui.startEmulator); err != nil {
+
+		emuGui.Close()
+		return nil, err
+	}
+
+	emuGui.gui = gui
+
+	return &emuGui, nil
 }
 
-// BeginMainLoop - Begins the terminal GUI main event listening loop
-func BeginMainLoop() {
-	if err := gui.MainLoop(); err != nil && err != gocui.ErrQuit {
+// MainLoop - Begins the terminal GUI main event listening loop
+func (me *EmulatorGUI) MainLoop() {
+
+	if err := me.gui.MainLoop(); err != nil && err != gocui.ErrQuit {
 		panic(err)
 	}
 }
 
-// LayoutGui - Initialize and generate main layout for terminal GUI
-func LayoutGui(g *gocui.Gui) error {
+func (me *EmulatorGUI) layoutGui(g *gocui.Gui) error {
 
 	g.BgColor = gocui.ColorBlack
 	g.FgColor = gocui.ColorWhite
@@ -110,8 +127,7 @@ func LayoutGui(g *gocui.Gui) error {
 	return nil
 }
 
-// RenderEmulator - Render an Emulator's properties on the terminal GUI
-func RenderEmulator(g *gocui.Gui, emu *Emulator) error {
+func (me *EmulatorGUI) renderEmulator(g *gocui.Gui) error {
 
 	registersView, err := g.View("registers")
 
@@ -121,9 +137,9 @@ func RenderEmulator(g *gocui.Gui, emu *Emulator) error {
 
 	registersView.Clear()
 
-	for i := 0; i < len(emu.Registers)/2; i++ {
+	for i := 0; i < len(me.emulator.Registers)/2; i++ {
 
-		fmt.Fprintf(registersView, " %s  | %04X | %s | %04X \n", getRegisterTitle(i), emu.Registers[i], getRegisterTitle(i+8), emu.Registers[i+8])
+		fmt.Fprintf(registersView, " %s  | %04X | %s | %04X \n", getRegisterTitle(i), me.emulator.Registers[i], getRegisterTitle(i+8), me.emulator.Registers[i+8])
 	}
 
 	screenView, err := g.View("screen")
@@ -132,7 +148,7 @@ func RenderEmulator(g *gocui.Gui, emu *Emulator) error {
 
 	for x := 0x80; x != 0; x >>= 1 {
 
-		for i := 0; i < len(emu.Screen); i++ {
+		for i := 0; i < len(me.emulator.Screen); i++ {
 
 			if emu.Screen[i]&byte(x) == 0 {
 				fmt.Fprintf(screenView, "%c", ' ')
@@ -160,6 +176,28 @@ func getRegisterTitle(index int) string {
 	} else {
 		return fmt.Sprintf("REG %1X", index)
 	}
+}
+
+func (me *EmulatorGUI) startEmulator(g *gocui.Gui, v *gocui.View) error {
+
+	if !me.emulatorStarted {
+
+		me.emulator.Emulate(me.updateLayout)
+		me.emulatorStarted = true
+	}
+
+	return nil
+}
+
+func (me *EmulatorGUI) updateLayout(emu *Emulator, err error) {
+
+	if err != nil {
+
+		me.Close()
+		panic(err)
+	}
+
+	me.gui.Update(me.renderEmulator)
 }
 
 func quit(g *gocui.Gui, v *gocui.View) error {
