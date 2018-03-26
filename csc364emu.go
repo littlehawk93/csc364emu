@@ -3,12 +3,9 @@ package main
 import (
 	"flag"
 	"fmt"
+	"ihex"
 	"os"
 )
-
-var gui *EmulatorGUI
-
-var emu *Emulator
 
 func main() {
 
@@ -24,7 +21,25 @@ func main() {
 		panic(fmt.Sprintf("Invalid ROM file provided: %s", err.Error()))
 	}
 
-	emu = NewEmulator()
+	file, err := os.Open(*romFile)
+
+	if err != nil {
+		panic(fmt.Sprintf("Unable to read ROM file: %s", err.Error()))
+	}
+
+	hexFile, err := ihex.NewI8HEX(file)
+
+	if err != nil {
+		panic(fmt.Sprintf("Unable to read I8HEX ROM file: %s", err.Error()))
+	}
+
+	emu := NewEmulator()
+
+	err = emu.LoadROM(hexFile)
+
+	if err != nil {
+		panic(fmt.Sprintf("Unable to load I8HEX ROM file: %s", err.Error()))
+	}
 
 	gui, err := NewGui(emu)
 

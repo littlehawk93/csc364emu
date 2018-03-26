@@ -11,6 +11,7 @@ type EmulatorGUI struct {
 	emulatorStarted bool
 	emulator        *Emulator
 	gui             *gocui.Gui
+	guiConstructed  bool
 }
 
 // Close - Close the terminal GUI
@@ -24,6 +25,8 @@ func NewGui(emu *Emulator) (*EmulatorGUI, error) {
 
 	var emuGui EmulatorGUI
 
+	emuGui.guiConstructed = false
+
 	emuGui.emulator = emu
 
 	gui, err := gocui.NewGui(gocui.OutputNormal)
@@ -34,7 +37,7 @@ func NewGui(emu *Emulator) (*EmulatorGUI, error) {
 
 	gui.Mouse = false
 
-	gui.SetManagerFunc(emuGui.layoutGui)
+	gui.SetManagerFunc(emuGui.renderEmulator)
 
 	if err = gui.SetKeybinding("", gocui.KeyCtrlC, gocui.ModNone, quit); err != nil {
 
@@ -94,8 +97,6 @@ func (me *EmulatorGUI) layoutGui(g *gocui.Gui) error {
 
 	clockView.Clear()
 
-	fmt.Fprintf(clockView, "Clock: %12d", emu.Clock)
-
 	screenView, err := g.SetView("screen", 2, 3, 19, 12)
 
 	if err != nil && err != gocui.ErrUnknownView {
@@ -124,10 +125,59 @@ func (me *EmulatorGUI) layoutGui(g *gocui.Gui) error {
 
 	registersView.Clear()
 
+	instructionView, err := g.SetView("instruction", 2, 14, 22, 16)
+
+	if err != nil && err != gocui.ErrUnknownView {
+		return err
+	}
+
+	instructionView.BgColor = gocui.ColorBlack
+	instructionView.FgColor = gocui.ColorWhite
+	instructionView.Editable = false
+	instructionView.Frame = true
+	instructionView.Title = "Instruction"
+
+	instructionView.Clear()
+
+	romView, err := g.SetView("rom", 54, 3, 69, 16)
+
+	if err != nil && err != gocui.ErrUnknownView {
+		return err
+	}
+
+	romView.BgColor = gocui.ColorBlack
+	romView.FgColor = gocui.ColorWhite
+	romView.Editable = false
+	romView.Frame = true
+	romView.Title = "ROM"
+
+	romView.Clear()
+
 	return nil
 }
 
 func (me *EmulatorGUI) renderEmulator(g *gocui.Gui) error {
+
+	if !me.guiConstructed {
+
+		err := me.layoutGui(g)
+
+		if err != nil {
+			return err
+		}
+
+		me.guiConstructed = true
+	}
+
+	clockView, err := g.View("clock")
+
+	if err != nil {
+		return err
+	}
+
+	clockView.Clear()
+
+	fmt.Fprintf(clockView, "Clock: %12d", me.emulator.Clock)
 
 	registersView, err := g.View("registers")
 
@@ -150,7 +200,7 @@ func (me *EmulatorGUI) renderEmulator(g *gocui.Gui) error {
 
 		for i := 0; i < len(me.emulator.Screen); i++ {
 
-			if emu.Screen[i]&byte(x) == 0 {
+			if me.emulator.Screen[i]&byte(x) == 0 {
 				fmt.Fprintf(screenView, "%c", ' ')
 			} else {
 				fmt.Fprintf(screenView, "%c", '\u2588')
@@ -158,6 +208,56 @@ func (me *EmulatorGUI) renderEmulator(g *gocui.Gui) error {
 		}
 
 		fmt.Fprintf(screenView, "%c", '\n')
+	}
+
+	instructionView, err := g.View("instruction")
+
+	if err != nil {
+		return nil
+	}
+
+	instructionView.Clear()
+
+	if me.emulator.Registers[15] < 0xFFFF {
+		fmt.Fprintf(instructionView, "   %1X   %1X   %1X   %1X   ", byte(me.emulator.ROM[me.emulator.Registers[15]]>>12&0x000F), byte(me.emulator.ROM[me.emulator.Registers[15]]>>8&0x000F), byte(me.emulator.ROM[me.emulator.Registers[15]]>>4&0x000F), byte(me.emulator.ROM[me.emulator.Registers[15]]&0x000F))
+	} else {
+		fmt.Fprint(instructionView, "   0   0   0   0   ")
+	}
+
+	romView, err := g.View("rom")
+
+	if err != nil {
+		return nil
+	}
+
+	romView.Clear()
+
+	romAddress := int(me.emulator.Registers[15])
+
+	var startAddress int
+	var endAddress int
+
+	if romAddress < 6 {
+		startAddress = 0
+	} else if romAddress > len(me.emulator.ROM)-6 {
+		startAddress = len(me.emulator.ROM) - 12
+	} else {
+		startAddress = romAddress - 6
+	}
+
+	endAddress = startAddress + 12
+
+	for i := startAddress; i < endAddress; i++ {
+
+		var colorCode string
+
+		if i == romAddress {
+			colorCode = "\u001b[42m"
+		} else {
+			colorCode = "\u001b[40m"
+		}
+
+		fmt.Fprintf(romView, "%s %05d | %04X \n", colorCode, i, me.emulator.ROM[i])
 	}
 
 	return nil
@@ -182,7 +282,7 @@ func (me *EmulatorGUI) startEmulator(g *gocui.Gui, v *gocui.View) error {
 
 	if !me.emulatorStarted {
 
-		me.emulator.Emulate(me.updateLayout)
+		go me.emulator.Emulate(me.updateLayout)
 		me.emulatorStarted = true
 	}
 
