@@ -3,8 +3,9 @@ package main
 import (
 	"flag"
 	"fmt"
-	"ihex"
 	"os"
+
+	"github.com/littlehawk93/ihex"
 )
 
 func main() {

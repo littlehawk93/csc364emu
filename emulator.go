@@ -2,8 +2,9 @@ package main
 
 import (
 	"fmt"
-	"ihex"
 	"time"
+
+	"github.com/littlehawk93/ihex"
 )
 
 const (
