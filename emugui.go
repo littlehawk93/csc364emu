@@ -84,7 +84,7 @@ func (me *EmulatorGUI) layoutGui(g *gocui.Gui) error {
 
 	fmt.Fprint(titleView, " LA Tech CSC 364 Emulator ")
 
-	clockView, err := g.SetView("clock", 32, 0, 52, 2)
+	clockView, err := g.SetView("clock", 49, 0, 69, 2)
 
 	if err != nil && err != gocui.ErrUnknownView {
 		return err
