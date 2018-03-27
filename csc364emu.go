@@ -28,7 +28,10 @@ func main() {
 		panic(fmt.Sprintf("Unable to read ROM file: %s", err.Error()))
 	}
 
-	hexFile, err := ihex.NewI8HEX(file)
+	hexFile := ihex.NewHexFile()
+	hexFile.Type = ihex.HexFileTypeI8HEX
+
+	_, err = hexFile.ReadFrom(file)
 
 	if err != nil {
 		panic(fmt.Sprintf("Unable to read I8HEX ROM file: %s", err.Error()))

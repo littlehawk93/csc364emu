@@ -87,9 +87,11 @@ func NewEmulator() *Emulator {
 }
 
 // LoadROM - Populate the ROM of this emulator using a I8HEX ROM File
-func (me *Emulator) LoadROM(file *ihex.I8HEX) error {
+func (me *Emulator) LoadROM(file *ihex.HexFile) error {
 
-	for record := file.NextRecord(); record != nil; record = file.NextRecord() {
+	for file.Next() {
+
+		record := file.Record()
 
 		if record.RecordType == ihex.RecordTypeData {
 
